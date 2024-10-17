@@ -132,6 +132,25 @@ order_AAChange <- c("p.S104G", "p.P824L", "p.D646N", "p.L655Ffs*10", "p.E991G", 
 All.info <- All.info %>%
   mutate(Ordered_AAChange = factor(AAChange, levels = order_AAChange))
 
+# Reemplazar múltiples valores usando recode
+All.info$Tumor_Sample_Barcode <- recode(All.info$Tumor_Sample_Barcode, 
+                                        "AL" = "HR01", 
+                                        "DC" = "HR02", 
+                                        "JC" = "HR03",
+                                        "JM" = "HR04",
+                                        "KV" = "HR05",
+                                        "LV" = "HR06",
+                                        "MC" = "HR07",
+                                        "ML" = "HR08",
+                                        "NS" = "HR09",
+                                        "PM" = "HR10",
+                                        "PP" = "HR11",
+                                        "PV" = "HR12",
+                                        "PZ" = "HR13",
+                                        "RQ" = "HR14",
+                                        "VM" = "HR15",
+                                        "YA" = "HR16")
+
 heatmap <- ggplot(data = All.info, mapping = aes(x = varcall, y = aaChange, fill = REVEL)) +
   geom_tile(color = "white", size = 0.1) +  # Definir el color y el tamaño de los bordes de las celdas
   scale_fill_gradient(low = "lightyellow", high = "red", limits = c(0, 0.7), na.value = "grey") +
@@ -146,6 +165,8 @@ heatmap <- ggplot(data = All.info, mapping = aes(x = varcall, y = aaChange, fill
     axis.text.x = element_text(color = "black", size = 8, angle = 90, hjust = 1, vjust = 0.5),  # Ajustar tamaño y ángulo del texto del eje x
     axis.text.y = element_text(color = "black", size = 8),  # Ajustar tamaño del texto del eje y
     strip.text.y = element_text(size = 8, angle = 0, colour = "black", margin = margin(r = 100)), 
+    strip.text.x = element_text(size = 8, angle = 90, colour = "black"), 
+
     legend.position = "top",  # Mover la leyenda a la derecha
     legend.title = element_text(size = 8),
     legend.text = element_text(size = 8),
@@ -154,11 +175,10 @@ heatmap <- ggplot(data = All.info, mapping = aes(x = varcall, y = aaChange, fill
   ggtitle("BRCA1/2 Mutations")
 
 ## save plot
-#png(filename = "F4_heatmap_BRCA.png", height = 6, width = 8, res = 300, units = "in")
-#heatmap
-#dev.off()
-
+#png(filename = "fig4.png", height = 6, width = 8, res = 800, units = "in")
+#pdf(file = "fig4.pdf",  height = 6, width = 8)  # Tamaño en pulgadas
 heatmap
+#dev.off()
 ```
 
 **Figure 4: Heatmap of BRCA1/2 mutations reported in 16 breast cancer patients using DeepVariant and Strelka, both in single and multisample mode.** The Y-axis shows the amino acid changes (right) in single and pooled modes (left), and the X-axis shows the 16 patients (top) across the two varcallers used (bottom). The color indicates the potential pathogenicity as given by the REVEL score. Variants without REVEL score are in gray.  Single-sample mode (S), Multisample mode (MS). 
