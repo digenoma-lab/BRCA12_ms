@@ -5,6 +5,9 @@ Code for figure and analysis of BRCA12 ms
 
 The medrxiv preprint is avaliable [here](https://www.medrxiv.org/content/10.1101/2024.09.25.24314295v1)
 
+## Workflow
+The nextflow pipeline is available [here](https://github.com/digenoma-lab/BRCA)
+
 ## Cite
 ***A workflow for clinical profiling of BRCA genes in Chilean breast cancer patients via targeted sequencing***
 Evelin González, Rodrigo Moreno Salinas, Manuel Muñoz, Soledad Lantadilla Herrera, Mylene Cabrera Morales, Pastor Jullian, Waleska Ebner Durrels, Gonzalo Vigueras Stari, Javier Anabalón Ramos, Juan Francisco Miquel, Lilian Jara, Carol Moraga, Alex Di Genova
