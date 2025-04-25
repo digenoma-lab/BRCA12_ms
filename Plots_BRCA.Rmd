@@ -7,17 +7,21 @@ date: "`r Sys.Date()`"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
 library(dplyr)
-library(tidyverse)
+#library(tidyverse)
 library(ggplot2)
-library(scales) # Para usar la función percent
-library(FactoMineR) # compute principal component methods
-library(factoextra) # for extracting, visualizing and interpreting the results.
+library(scales)
+library(FactoMineR)
+library(factoextra)
 library(cowplot)
 library(maftools)
 library(readr)
+setwd("/mnt/beegfs/home/efeliu/work2024/080524_nextflow_BRCA/HRR_RunBRCA/plots_paper/BRCA12_ms")
 
+```
 
+```{r setup, include=FALSE}
 
 deepvariant.single.pass<-read.csv("input/DeepVariant_single_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
 ln.deepvariant.single.pass = read.maf(maf = deepvariant.single.pass) 
@@ -37,8 +41,8 @@ ln.strelka.pool.pass = read.maf(maf = strelka.pool.pass)
 
 ```{r plotSummary, echo=FALSE, include=FALSE}
 
-filenames.s <- Sys.glob("input/annovar/*SS*hg38_multianno.txt")
-annovar_mafs.s = lapply(filenames.s, annovarToMaf, table = "ensGene", ens2hugo = FALSE,refBuild = "hg38") #convert to MAFs using annovarToMaf
+filenames.s <- Sys.glob("../../annovar/*SS*hg38_multianno.txt")
+annovar_mafs.s = lapply(filenames.s, annovarToMaf,refBuild = "hg38") #convert to MAFs using annovarToMaf
 annovar.s = data.table::rbindlist(l = annovar_mafs.s, fill = TRUE) #Merge into single MAF
 
 vcNames <-c("Frame_Shift_Del","Frame_Shift_Ins","Missense_Mutation","Nonsense_Mutation","Silent")
@@ -47,7 +51,9 @@ summary = read.maf(maf = annovar.s, vc_nonSyn = vcNames)
 ```
 
 ```{r plotSummary2, echo=FALSE}
-plotmafSummary(maf=summary, rmOutlier = TRUE, addStat = 'median', dashboard = TRUE, titvRaw = FALSE, showBarcodes = TRUE, textSize = 0.6)
+png(filename = "Plots_BRCA_files/V2/fig2.png", height = 6, width = 8, res = 1000, units = "in")
+plotmafSummary(maf=summary, rmOutlier = TRUE, addStat = 'median', dashboard = TRUE, titvRaw = FALSE, showBarcodes = FALSE, textSize = 0.6)
+dev.off()
 ```
 
 **Figure 2: Summary of germline mutations found in BC patients.** This figure presents a comprehensive summary of the mutations identified in BC patients. It includes a bar plot categorizing the variants by classification (silent, missense, and frameshift insertion) and type (SNP and INS). The figure also shows the number of variants per sample, variant type, and the nature of the genetic change. The number of variants in each sample is d|isplayed asx a stacked bar plot, while the variant types are summarized in a box plot according to their classification. Finally, we show the percentage of samples with mutations in each gene.
@@ -57,21 +63,30 @@ plotmafSummary(maf=summary, rmOutlier = TRUE, addStat = 'median', dashboard = TR
 ```{r varcallers, echo=FALSE}
 
 ## Strelka vs Deepvariant - BRCA1
-lollipopPlot2(m1 = ln.strelka.single.pass, m2 = ln.deepvariant.single.pass, gene = "BRCA1", AACol1 = "aaChange", AACol2 = "aaChange", m1_name = "strelka", m2_name = "deepvariant",showDomainLabel = FALSE, refSeqID = 'NM_007300')
+png(filename = "Plots_BRCA_files/V2/fig3A.png", height = 3, width = 8, res = 1000, units = "in")
+lollipopPlot2(m1 = ln.strelka.single.pass, m2 = ln.deepvariant.single.pass, gene = "BRCA1", AACol1 = "aaChange", AACol2 = "aaChange", m1_name = "strelka", m2_name = "deepvariant",showDomainLabel = FALSE, refSeqID = 'NM_007294')
+dev.off()
 
 ### Strelka vs Deepvariant - BRCA2
+png(filename = "Plots_BRCA_files/V2/fig3B.png", height = 3, width = 8, res = 1000, units = "in")
 lollipopPlot2(m1 =ln.strelka.single.pass, m2 = ln.deepvariant.single.pass,, gene = "BRCA2", AACol1 = "aaChange", AACol2 = "aaChange", m1_name = "strelka", m2_name = "deepvariant",showDomainLabel = FALSE)
+dev.off()
+
 ```
 
 **Figure 3: Lollipop Plots of variants in BRCA1 and BRCA2 detected by Strelka and DeepVariant varcallers.** Graphical representation of the BRCA1 and BRCA2 genes, comparing the mutations obtained by Strelka and Deepvariant. The Y-axis shows the number of patients with missense mutations (green) and frameshift insertions (purple). The top section represents the results from Strelka, and the bottom section represents the results from DeepVariant of each gene. The domains are in the labels. The results correspond to the variants obtained by both varcallers in single mode.
 
-
 ## Figure 4
 
 ```{r heatmap, echo=FALSE, warning=FALSE}
+
+## Import rename file
+rename<-read.csv("../../annovar/rename.csv", header = FALSE)
+
 ## Import Deepvariant pool
 deepvariant.pool<-read.csv("input/DeepVariant_pool_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
 deepvariant.pool<-deepvariant.pool[deepvariant.pool$Variant_Classification!="Silent",]
+
 ## Import Deepvariant single
 deepvariant.single<-read.csv("input/DeepVariant_single_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
 deepvariant.single<-deepvariant.single[deepvariant.single$Variant_Classification!="Silent",]
@@ -118,51 +133,37 @@ strelka <- rbind(
 )
 strelka$varcall<-"Strelka"
 
+test<-strelka.pool[strelka.pool$AAChange=="p.T1301Afs*32",]
+
 ### MERGE DEEPVARIANT (single-pool) - STRELKA (single-pool)
 strelka.select<-strelka[c("Tumor_Sample_Barcode","aaChange","mode","varcall", "REVEL","AAChange", "Hugo_Symbol")]
 deepvariant.select<-deepvariant[c("Tumor_Sample_Barcode","aaChange","mode","varcall", "REVEL","AAChange", "Hugo_Symbol")]
 
 All.info<-rbind(strelka.select,deepvariant.select)
+##All.info$aaChange<-reorder(All.info$aaChange, All.info$Start_Position)
 All.info$Hugo_Symbol <- factor(All.info$Hugo_Symbol, levels = c("BRCA1", "BRCA2"))
 
 # Order by gen and position of AAChange
-order_AAChange <- c("p.S104G", "p.P824L", "p.D646N", "p.L655Ffs*10", "p.E991G", "p.S993N", "p.K1136R", "p.E1390G",
-                    "p.N289H", "p.N372H", "p.K797Q", "p.N991D", "p.T1915M", "p.R2108H", "p.V2466A", "p.A2951T", "p.I2490T")
+#order_AAChange <- c("p.S104G", "p.P824L", "p.D646N", "p.L655Ffs*10", "p.E991G", "p.S993N", "p.K1136R", "p.E1390G",
+#                    "p.N289H", "p.N372H", "p.K797Q", "p.N991D", "p.T1915M", "p.R2108H", "p.V2466A", "p.A2951T","p.I2490T")
 
-All.info <- All.info %>%
-  mutate(Ordered_AAChange = factor(AAChange, levels = order_AAChange))
+#All.info <- All.info %>%
+#  mutate(Ordered_AAChange = factor(AAChange, levels = order_AAChange))
+All.info$Tumor_Sample_Barcode<-rename$V2[match(All.info$Tumor_Sample_Barcode, rename$V1)]
 
-# Reemplazar múltiples valores usando recode
-All.info$Tumor_Sample_Barcode <- recode(All.info$Tumor_Sample_Barcode, 
-                                        "AL" = "HR01", 
-                                        "DC" = "HR02", 
-                                        "JC" = "HR03",
-                                        "JM" = "HR04",
-                                        "KV" = "HR05",
-                                        "LV" = "HR06",
-                                        "MC" = "HR07",
-                                        "ML" = "HR08",
-                                        "NS" = "HR09",
-                                        "PM" = "HR10",
-                                        "PP" = "HR11",
-                                        "PV" = "HR12",
-                                        "PZ" = "HR13",
-                                        "RQ" = "HR14",
-                                        "VM" = "HR15",
-                                        "YA" = "HR16")
 
 heatmap <- ggplot(data = All.info, mapping = aes(x = varcall, y = aaChange, fill = REVEL)) +
   geom_tile(color = "white", size = 0.1) +  # Definir el color y el tamaño de los bordes de las celdas
   scale_fill_gradient(low = "lightyellow", high = "red", limits = c(0, 0.7), na.value = "grey") +
   xlab("Sample") +
   ylab("Amino Acid Change") +
-  facet_grid(Ordered_AAChange ~ Tumor_Sample_Barcode , scales = "free", space = "free") + ##AAChange
+  facet_grid(AAChange ~ Tumor_Sample_Barcode , scales = "free", space = "free") + ##AAChange
   theme_minimal(base_size = 10) +
   theme(
     panel.spacing = unit(0, "lines"),
     panel.border = element_rect(color = "black", fill = NA, size = 0.1),
     panel.grid.major = element_blank(),  # Eliminar líneas de la cuadrícula mayor
-    axis.text.x = element_text(color = "black", size = 8, angle = 90, hjust = 1, vjust = 0.5),  # Ajustar tamaño y ángulo del texto del eje x
+    axis.text.x = element_text(color = "black", size = 8, angle = 90, hjust = 1, vjust = 0.5),  # Ajustar tamaño y ángulo del texto del eje
     axis.text.y = element_text(color = "black", size = 8),  # Ajustar tamaño del texto del eje y
     strip.text.y = element_text(size = 8, angle = 0, colour = "black", margin = margin(r = 100)), 
     strip.text.x = element_text(size = 8, angle = 90, colour = "black"), 
@@ -175,18 +176,20 @@ heatmap <- ggplot(data = All.info, mapping = aes(x = varcall, y = aaChange, fill
   ggtitle("BRCA1/2 Mutations")
 
 ## save plot
-#png(filename = "fig4.png", height = 6, width = 8, res = 800, units = "in")
-#pdf(file = "fig4.pdf",  height = 6, width = 8)  # Tamaño en pulgadas
+png(filename = "Plots_BRCA_files/V2/fig4.png", height = 12, width = 20, res = 800, units = "in")
+#pdf(file = "Plots_BRCA_files/V2/fig4.pdf",  height = 6, width = 8)  # Tamaño en pulgadas
 heatmap
-#dev.off()
+dev.off()
 ```
 
 **Figure 4: Heatmap of BRCA1/2 mutations reported in 16 breast cancer patients using DeepVariant and Strelka, both in single and multisample mode.** The Y-axis shows the amino acid changes (right) in single and pooled modes (left), and the X-axis shows the 16 patients (top) across the two varcallers used (bottom). The color indicates the potential pathogenicity as given by the REVEL score. Variants without REVEL score are in gray.  Single-sample mode (S), Multisample mode (MS). 
 
-
 ## Figure 5
 
 ```{r PCA1, echo=FALSE, warning=FALSE}
+library(dplyr)
+library(tidyr)
+
 variantes<-read.csv("input/Strelka_single_variants_PASS_exonic.tsv",sep = "\t")
 variantes<-variantes[variantes$Variant_Classification!="Silent",]
 
@@ -194,11 +197,13 @@ variantes <- variantes %>% separate(Otherinfo13, c("GT"), "[:]")
 variantes <- variantes %>% separate(GT, c("A1","A2"), "[/||]")
 variantes$sum<- as.numeric(variantes$A1) + as.numeric(variantes$A2)
 
+uniq<-variantes %>% distinct(txChange,Gene.refGene, gnomad40_genome_AF)
+uniq_sample<-variantes %>% distinct(Tumor_Sample_Barcode)
 ## delete of variants without gnomad annotation 
-variantes<-variantes[variantes$aaChange!="p.E1390G" &  variantes$aaChange!="p.L655Ffs*10" & variantes$aaChange!="p.K797Q", ]
+variantes.aux<-variantes[variantes$gnomad40_genome_AF!=".",]
 
 # gruop by 'aaChange' y summarise the column 'sum' 
-variantes_suma <- variantes %>%
+variantes_suma <- variantes.aux %>%
   group_by(aaChange,
            gnomad40_genome_AF_afr,
            gnomad40_genome_AF_amr,
@@ -208,17 +213,17 @@ variantes_suma <- variantes %>%
            gnomad40_genome_AF_sas,
            gnomad40_genome_AF_fin,
            gnomad40_genome_AF_mid,
-           gnomad40_genome_AF_nfe,
-           gnomad40_genome_AF_XX) %>%
+           gnomad40_genome_AF_nfe) %>%
   summarise(total_sum = sum(sum, na.rm = TRUE), .groups = 'drop')
 
+variantes_suma.aux<-variantes_suma
 
 variantes_suma$sum<-NULL
-variantes_suma$AF<-variantes_suma$total_sum/32
+variantes_suma$AF<-variantes_suma$total_sum/166
 variantes_suma$total_sum<-NULL
 variantes_suma$AF<-as.numeric(variantes_suma$AF)
-colnames(variantes_suma)<-c("aaChange","afr","amr","ami","asj","eas","sas","fin","mid","nfe","XX","chi")
-variantes_suma <- variantes_suma %>% mutate_at(c("afr","amr","ami","asj","eas","sas","fin","mid","nfe","XX","chi"), as.numeric)
+colnames(variantes_suma)<-c("aaChange","afr","amr","ami","asj","eas","sas","fin","mid","nfe","chi")
+variantes_suma <- variantes_suma %>% mutate_at(c("afr","amr","ami","asj","eas","sas","fin","mid","nfe","chi"), as.numeric)
 
 # Convert tibble to data frame
 data_pca_df<- t(as.data.frame(variantes_suma[,-1]))
@@ -246,16 +251,118 @@ contrib<-fviz_contrib(res2.pca, choice = "var", axes = 1,title="")
 
 combined_plot<-plot_grid(dend, contrib, nrow = 1, ncol = 2)
 # save plot 
-#png(file="F5_PCA_den.png", width=6, height=3, res=400, unit = "in")
-#combined_plot
-#dev.off()
+png(file="Plots_BRCA_files/V2/Fig5_GG.png", width=8, height=3, res=400, unit = "in")
+combined_plot
+dev.off()
 
 combined_plot
 ```
 
 **Figure 5: Hierarchical clustering and variable contribution on principal components.** A) Clustering of PCA dimension B) Contribution of mutations to dimensions 1 and 2. A dashed line shown corresponds to the expected value if the contribution were uniform. Subpopulations: Africans (AFR), Admixed Americans (AMR), Amish (AMI), Ashkenazi Jewish (ASJ), East Asians (EAS), South Asians (SAS), Finns (FIN), Middle Easterners (MID), Non-Finnish Europeans (NFE), and women (XX).
 
+## Figure 6
 
+```{r sophia, echo=FALSE, warning=FALSE, prompt=FALSE}
+library(tidyr)
+library(dplyr)
+library(cowplot)
+library(ggVennDiagram)
+library(ggplot2)
+
+# Cargar y procesar archivo SOPHiA
+load_sophia <- function(path) {
+  read.csv(path, header = TRUE) %>%
+    mutate(ID = paste0(SampleId, "|", hg38.genome_position, "|", hg38.ref, "|", hg38.alt)) %>%
+    filter(codingConsequence %in% c("missense", "frameshift", "nonsense")) %>%
+    select(ID, CLNSIGLAB, c.DNA, protein)
+}
+
+# Cargar y procesar archivo Strelka o DeepVariant
+load_variant_data <- function(path, caller, single) {
+  df <- read.csv(path, header = TRUE, sep ="\t")
+
+    if(single){
+        if(caller=="strelka") {
+            df <- df %>% separate(Otherinfo13, c("GT", "GQ", "GQX", "DP", "DPF", "AD"), "[:]", extra = "drop")
+        }else {
+      df <- df %>% separate(Otherinfo13, c("GT", "GQ", "DP", "AD", "VAF", "PL"), "[:]", extra = "drop")
+      }
+    }
+  
+  df <- df %>%
+    separate(AD, c("DP_REF", "DP_ALT"), "[,]") %>%
+    mutate(ID = paste0(Tumor_Sample_Barcode, "|", Otherinfo5, "|", Otherinfo7, "|", Otherinfo8),
+           DP = as.numeric(DP)) %>%
+    filter(DP > 30, Tumor_Sample_Barcode != "61") %>%
+    filter(Variant_Classification %in% c("Missense_Mutation", "Frame_Shift_Ins", 
+                                         "Frame_Shift_Del", "Nonsense_Mutation")) %>%
+    select(ID, Hugo_Symbol, Variant_Type, aaChange, DP_ALT, DP_REF, CLNSIG, DP) %>%
+    mutate(ID = gsub("48\\|43093043\\|TAA\\|T", "48|43093043|TAAA|TA", ID),
+           ID = gsub("43\\|43093043\\|TAA\\|T", "43|43093043|TAAA|TA", ID),
+           ID = gsub("39\\|43093425\\|T\\|TA", "39|43093425|TAA|TAAA", ID),
+           ID = gsub("77\\|43093425\\|T\\|TA", "77|43093425|TAA|TAAA", ID),
+           ID = gsub("LV\\|43093425\\|T\\|TA", "LV|43093425|TAA|TAAA", ID))
+}
+
+# Crear Venn plot
+create_venn <- function(list_input, title, colors, names) {
+  ggVennDiagram(
+    list_input, set_size = 3.5,
+    category.names = names) +
+    scale_x_continuous(expand = expansion(mult = .2)) +
+    ggtitle(title) +
+    ggplot2::scale_fill_gradient(low = colors[1], high = colors[2]) +
+    theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
+}
+
+### MAIN PIPELINE ###
+sophia <- load_sophia("input/all_variants_sophia.csv")
+
+# Single
+strelka_single <- load_variant_data("input/Strelka_single_variants_PASS_exonic.tsv", "strelka",TRUE)
+deep_single <- load_variant_data("input/DeepVariant_single_variants_PASS_exonic.tsv", "deep",TRUE)
+
+venn_single_ns <- create_venn(
+  list(SOPHiA = sophia$ID, Strelka_single = strelka_single$ID, deepvariant_single = deep_single$ID),
+  "Non-synonymous", c("#F6AC50", "#B54923"),
+  c("SOPHiA\nGENETICS", "STRELKA\nSINGLE", "\nDEEPVARIANT SINGLE")
+)
+
+venn_single_pat <- create_venn(
+  list(SOPHiA = filter(sophia, CLNSIGLAB == "Pathogenic")$ID,
+       Strelka_single = filter(strelka_single, CLNSIG == "Pathogenic")$ID,
+       Deepvariant_single = filter(deep_single, CLNSIG == "Pathogenic")$ID),
+  "Pathogenic", c("#87B6D9", "#497AA7"),
+  c("SOPHiA\nGENETICS", "STRELKA\nSINGLE", "\nDEEPVARIANT SINGLE")
+)
+#save_venn_plots(venn_single_ns, venn_single_pat,"Plots_BRCA_files/V2/fig6.png")
+png(file = "Plots_BRCA_files/V2/fig6.png", width = 10, height = 5, res = 400, unit = "in")
+plot_grid(venn_single_ns, venn_single_pat, labels = c("A", "B"), ncol = 2)
+dev.off()
+
+# Multisample
+strelka_multi <- load_variant_data("input/Strelka_pool_variants_PASS_exonic.tsv", "strelka",FALSE)
+deep_multi <- load_variant_data("input/DeepVariant_pool_variants_PASS_exonic.tsv", "deep",FALSE)
+
+venn_multi_ns <- create_venn(
+  list(SOPHiA = sophia$ID, Strelka_multisample = strelka_multi$ID, deepvariant_multisample = deep_multi$ID),
+  "Non-synonymous", c("#F6AC50", "#B54923"),
+  c("SOPHiA\nGENETICS", "STRELKA\nMULTISAMPLE", "\nDEEPVARIANT MULTISAMPLE")
+)
+
+venn_multi_pat <- create_venn(
+  list(SOPHiA = filter(sophia, CLNSIGLAB == "Pathogenic")$ID,
+       Strelka_multisample = filter(strelka_multi, CLNSIG == "Pathogenic")$ID,
+       Deepvariant_multisample = filter(deep_multi, CLNSIG == "Pathogenic")$ID),
+  "Pathogenic", c("#87B6D9", "#497AA7"),
+  c("SOPHiA\nGENETICS", "STRELKA\nMULTISAMPLE", "\nDEEPVARIANT MULTISAMPLE")
+)
+
+png(file ="Plots_BRCA_files/V2/Sup_fig6.png", width = 10, height = 5, res = 400, unit = "in")
+plot_grid(venn_multi_ns, venn_multi_pat, labels = c("A", "B"), ncol = 2)
+dev.off()
+```
+**Figure 6: Overlap of BRCA1/BRCA2 variants identified by different variant calling approaches.** Venn diagram comparing BRCA1 and BRCA2 variants reported by SOPHiA Genetics in breast cancer patients with those identified using a workflow based on the Strelka and DeepVariant variant callers in single mode. A) Non-synonymous variants detected across the three approaches. B) Subset of non-synonymous variants classified as pathogenic in ClinVar database
 ## Supplementary Figure 1
 
 ```{r timetask, echo=FALSE, warning=FALSE, prompt=FALSE}
@@ -377,9 +484,14 @@ plot_coverage
 ```{r lollipopPlot2_strelka, echo=FALSE, warning=FALSE}
 
 ### strelka single vs multisample - BRCA1
-lollipopPlot2(m1 = ln.strelka.single.pass, m2 = ln.strelka.pool.pass, gene = 'BRCA1', AACol1 = 'aaChange', AACol2 = 'aaChange', m1_name = "strelka-single", m2_name = "strelka-pool", refSeqID = 'NM_007300',showDomainLabel = FALSE)
+png(filename = "Plots_BRCA_files/V2/Sup_fig4A.png", height = 3, width = 8, res = 1000, units = "in")
+lollipopPlot2(m1 = ln.strelka.single.pass, m2 = ln.strelka.pool.pass, gene = 'BRCA1', AACol1 = 'aaChange', AACol2 = 'aaChange', m1_name = "strelka-single", m2_name = "strelka-pool", refSeqID = 'NM_007294',showDomainLabel = FALSE)
+dev.off()
+
 ### strelka single vs multisample - BRCA2
+png(filename = "Plots_BRCA_files/V2/Sup_fig4B.png", height = 3, width = 8, res = 1000, units = "in")
 lollipopPlot2(m1 = ln.strelka.single.pass, m2 = ln.strelka.pool.pass, gene = 'BRCA2', AACol1 = 'aaChange', AACol2 = 'aaChange',m1_name = "strelka-single", m2_name = "strelka-pool",showDomainLabel = FALSE)
+dev.off()
 
 ```
 
@@ -391,10 +503,15 @@ lollipopPlot2(m1 = ln.strelka.single.pass, m2 = ln.strelka.pool.pass, gene = 'BR
 ```{r lollipopPlot2_Deepvariant, echo=FALSE, warning=FALSE}
 
 ### DeepVariant single vs multisample - BRCA1
-lollipopPlot2(m1 = ln.deepvariant.single.pass, m2 = ln.deepvariant.pool.pass, gene = 'BRCA1', AACol1 = 'aaChange', AACol2 = 'aaChange', m1_name = "deepvariant-single", m2_name = "deepvariant-pool", refSeqID = 'NM_007300',showDomainLabel = FALSE)
+png(filename = "Plots_BRCA_files/V2/Sup_fig5A.png", height = 3, width = 8, res = 1000, units = "in")
+lollipopPlot2(m1 = ln.deepvariant.single.pass, m2 = ln.deepvariant.pool.pass, gene = 'BRCA1', AACol1 = 'aaChange', AACol2 = 'aaChange', m1_name = "deepvariant-single", m2_name = "deepvariant-pool", refSeqID = 'NM_007294',showDomainLabel = FALSE)
+dev.off()
 
 ### DeepVariant single vs multisample - BRCA2
+png(filename = "Plots_BRCA_files/V2/Sup_fig5B.png", height = 3, width = 8, res = 1000, units = "in")
 lollipopPlot2(m1 = ln.deepvariant.single.pass, m2 = ln.deepvariant.pool.pass, gene = 'BRCA2', AACol1 = 'aaChange', AACol2 = 'aaChange',m1_name = "deepvariant-single", m2_name = "deepvariant-pool",showDomainLabel = FALSE)
+dev.off()
+
 ```
 
 **Figure 5: Comparison of the nonsynonymous variants reported by the DeepVariant varcaller in single and multisample modes.** SNVs and INDELs reported for the 16 patients in the BRCA1 and BRCA2 genes. The Y-axis shows the number of patients with the mutation, and the X-axis shows the amino acids and domains of each gen
@@ -414,7 +531,7 @@ scree_plot<-fviz_eig(res2.pca,addlabels = TRUE,title="",hjust = -0.5)
 cluster<-fviz_cluster(res.hcpc,
              repel = TRUE, # Avoid label overlapping
              show.clust.cent = TRUE, # Show cluster centers
-             palette = "jco", # Color palette see ?ggpubr::ggpar 
+             palette = "jco", # Color palette see ?ggpubr::ggpar
              ggtheme = theme_minimal(),
              main = "")
 
@@ -422,11 +539,38 @@ combined_plot2 <- plot_grid(pca_biplot, scree_plot, cluster, rel_heights = 2,
                            nrow = 1, ncol = 3)
 
 # save plot 
-#png(file="SF7_PCA.png", width=12, height=4, res=400, unit = "in")
-#print(combined_plot2)
-#dev.off()
+png(file="Plots_BRCA_files/V2/Sup_fig7.png", width=12, height=4, res=400, unit = "in")
+combined_plot2
+dev.off()
 combined_plot2
 ```
 
 **Figure 7: Principal Component Analysis (PCA) of allele frequency variants in breast cancer patients.** a) PCA plot showing dimensions 1 and 2. b) Percentage of variance explained by each dimension. c) Clustering of populations. 
+
+
+## Table 1
+
+```{r table1, echo=FALSE, warning=FALSE}
+## run chunck PCA1 (Figure 5) before chunck table 1. 
+
+variantes.aux <-variantes.aux %>% separate(AAChange.refGene, c("A","B"), sep="NM_007294|NM_000059")
+variantes.aux <-variantes.aux %>% separate(B,c("B","exon","txChange","aaChange"), sep = ":")
+
+variantes.aux$tx[variantes.aux$Hugo_Symbol=="BRCA1"]<-"NM_007294.4"
+variantes.aux$tx[variantes.aux$Hugo_Symbol=="BRCA2"]<-"NM_000059.4"
+
+variantes.aux$sum<-NULL
+variantes.aux$AF<-variantes.aux$total_sum/166
+variantes.aux$total_sum<-NULL
+variantes.aux$AF<-as.numeric(variantes.aux$AF)
+
+#uniq<-variantes.aux %>% distinct(txChange,Gene.refGene, gnomad40_genome_AF)
+
+### Change tx for BRCA1 by NM_007294
+
+### Agregar BRCA-Exchage annotation - ENIGMA
+
+
+
+```
 
