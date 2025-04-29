@@ -17,6 +17,7 @@ library(factoextra)
 library(cowplot)
 library(maftools)
 library(readr)
+library(tidyr)
 setwd("/mnt/beegfs/home/efeliu/work2024/080524_nextflow_BRCA/HRR_RunBRCA/plots_paper/BRCA12_ms")
 
 ```
@@ -24,30 +25,30 @@ setwd("/mnt/beegfs/home/efeliu/work2024/080524_nextflow_BRCA/HRR_RunBRCA/plots_p
 ```{r setup, include=FALSE}
 
 deepvariant.single.pass<-read.csv("input/DeepVariant_single_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
+deepvariant.single.pass <- deepvariant.single.pass %>% separate(Otherinfo13, c("GT", "GQ", "DP", "AD", "VAF", "PL"), "[:]", extra = "drop")
+deepvariant.single.pass <- deepvariant.single.pass %>% mutate(DP = as.numeric(DP)) %>% filter(DP > 30)
 ln.deepvariant.single.pass = read.maf(maf = deepvariant.single.pass) 
 
 deepvariant.pool.pass<-read.csv("input/DeepVariant_pool_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
+deepvariant.pool.pass <- deepvariant.pool.pass %>% mutate(DP = as.numeric(DP)) %>% filter(DP > 30)
 ln.deepvariant.pool.pass = read.maf(maf = deepvariant.pool.pass)
 
 strelka.single.pass<-read.csv("input/Strelka_single_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
-ln.strelka.single.pass = read.maf(maf = strelka.single.pass) 
+strelka.single.pass <- strelka.single.pass %>% separate(Otherinfo13, c("GT", "GQ", "GQX", "DP", "DPF", "AD"), "[:]", extra = "drop")
+strelka.single.pass <- strelka.single.pass %>% mutate(DP = as.numeric(DP)) %>% filter(DP > 30)
+ln.strelka.single.pass = read.maf(maf = strelka.single.pass)
 
 strelka.pool.pass<-read.csv("input/Strelka_pool_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
-ln.strelka.pool.pass = read.maf(maf = strelka.pool.pass) 
+strelka.pool.pass <- strelka.pool.pass %>% mutate(DP = as.numeric(DP)) %>% filter(DP > 30)
+ln.strelka.pool.pass = read.maf(maf = strelka.pool.pass)
 
 ```
 
 ## Figure 2
 
 ```{r plotSummary, echo=FALSE, include=FALSE}
-
-filenames.s <- Sys.glob("../../annovar/*SS*hg38_multianno.txt")
-annovar_mafs.s = lapply(filenames.s, annovarToMaf,refBuild = "hg38") #convert to MAFs using annovarToMaf
-annovar.s = data.table::rbindlist(l = annovar_mafs.s, fill = TRUE) #Merge into single MAF
-
 vcNames <-c("Frame_Shift_Del","Frame_Shift_Ins","Missense_Mutation","Nonsense_Mutation","Silent")
-
-summary = read.maf(maf = annovar.s, vc_nonSyn = vcNames)
+summary = read.maf(maf = strelka.single.pass, vc_nonSyn = vcNames)
 ```
 
 ```{r plotSummary2, echo=FALSE}
@@ -76,7 +77,7 @@ dev.off()
 
 **Figure 3: Lollipop Plots of variants in BRCA1 and BRCA2 detected by Strelka and DeepVariant varcallers.** Graphical representation of the BRCA1 and BRCA2 genes, comparing the mutations obtained by Strelka and Deepvariant. The Y-axis shows the number of patients with missense mutations (green) and frameshift insertions (purple). The top section represents the results from Strelka, and the bottom section represents the results from DeepVariant of each gene. The domains are in the labels. The results correspond to the variants obtained by both varcallers in single mode.
 
-## Figure 4
+## Figure 4 - deleted
 
 ```{r heatmap, echo=FALSE, warning=FALSE}
 
@@ -84,18 +85,13 @@ dev.off()
 rename<-read.csv("../../annovar/rename.csv", header = FALSE)
 
 ## Import Deepvariant pool
-deepvariant.pool<-read.csv("input/DeepVariant_pool_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
-deepvariant.pool<-deepvariant.pool[deepvariant.pool$Variant_Classification!="Silent",]
-
+deepvariant.pool.filter<-deepvariant.pool[deepvariant.pool$Variant_Classification!="Silent",]
 ## Import Deepvariant single
-deepvariant.single<-read.csv("input/DeepVariant_single_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
-deepvariant.single<-deepvariant.single[deepvariant.single$Variant_Classification!="Silent",]
+deepvariant.single.filter<-deepvariant.single[deepvariant.single$Variant_Classification!="Silent",]
 ## Import Strelka pool
-strelka.single<-read.csv("input/Strelka_single_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
-strelka.single<-strelka.single[strelka.single$Variant_Classification!="Silent",]
+strelka.single.filter<-strelka.single[strelka.single$Variant_Classification!="Silent",]
 ## Import Strelka single
-strelka.pool<-read.csv("input/Strelka_pool_variants_PASS_exonic.tsv",sep = "\t", header = TRUE)
-strelka.pool<-strelka.pool[strelka.pool$Variant_Classification!="Silent",]
+strelka.pool.filter<-strelka.pool[strelka.pool$Variant_Classification!="Silent",]
 
 ## Preprocesing DEEPVARIANT
 deepvariant.pool$REVEL<-as.numeric(deepvariant.pool$REVEL)
@@ -157,7 +153,7 @@ heatmap <- ggplot(data = All.info, mapping = aes(x = varcall, y = aaChange, fill
   scale_fill_gradient(low = "lightyellow", high = "red", limits = c(0, 0.7), na.value = "grey") +
   xlab("Sample") +
   ylab("Amino Acid Change") +
-  facet_grid(AAChange ~ Tumor_Sample_Barcode , scales = "free", space = "free") + ##AAChange
+  facet_grid(AAChange ~ Tumor_Sample_Barcode, scales = "free", space = "free") + ##AAChange
   theme_minimal(base_size = 10) +
   theme(
     panel.spacing = unit(0, "lines"),
@@ -415,6 +411,88 @@ boxplot
 - GLNEXUS_DEEPVARIANT: Variant calling by DeepVariant in multisample mode.
 
 
+## Supplementary Figure 2
+
+```{r fun_PlotQC, echo=FALSE, warning=FALSE}
+
+plotQC <- function(data,title,color) {
+  
+plot <- ggplot(data, aes(x=variable, y = value)) +
+  geom_violin(trim = FALSE, fill =color, color =color, alpha = 0.1) + 
+  geom_jitter(width = 0.2, size = 1.5, color =color) + # Puntos transparentes
+  stat_summary(
+    fun = median, 
+    geom = "crossbar", 
+    width = 2, 
+    linetype = "dashed", 
+    color = "black", 
+    alpha = 0.9,
+    size = 0.2 
+  ) + 
+  coord_flip() + 
+  theme_minimal(base_size = 10) + 
+  theme(
+    panel.grid.major = element_line(color = "gray90"),
+    plot.title = element_text(hjust = 0.5),
+    axis.line.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  labs(x ="", y ="", title = title) +
+  theme(
+    plot.title = element_text(face = "bold")
+  )
+return(plot)
+}
+```
+
+```{r data, echo=FALSE, warning=FALSE,message=FALSE}
+library(reshape)
+## Load outputs of multiQC obtained for short reads
+general_qc<-read.csv("input/multiqc_general_stats.txt", sep = '\t')
+melt_data<-melt(general_qc)
+```
+
+```{r MGIplots, echo=FALSE, warning=FALSE}
+### Plots QC metrics short reads
+## Plot N1
+total_reads<-melt_data %>% filter(variable=="FastQC_mqc_generalstats_fastqc_total_sequences" & ! is.na(value))
+#total_reads$value<-as.numeric(total_reads$value/1000000)
+mean(pct_aligned$value)
+summary_total_reads <- summary(total_reads)
+
+plot.total_reads<-plotQC(total_reads,"Total Reads (M)","#1B9E77")
+## Plot N2
+pct_aligned<-melt_data %>% filter(variable=="QualiMap_mqc_generalstats_qualimap_percentage_aligned" & ! is.na(value))
+mean(pct_aligned$value)
+plot.pct_aligned<-plotQC(pct_aligned,"Aligned Reads (%)","#E7298A")
+## Plot N3
+percentage_50X<-melt_data %>% filter(variable=="QualiMap_mqc_generalstats_qualimap_mqc_50_x_pc"  & ! is.na(value))
+mean(percentage_50X$value)
+plot.percentage_50X<-plotQC(percentage_50X,"Reads with ≥50X Coverage (%)","#E6AB02")
+## plot N4
+mean_coverage<-melt_data %>% filter(variable=="QualiMap_mqc_generalstats_qualimap_mean_coverage"  & ! is.na(value))
+plot.mean_coverage<-plotQC(mean_coverage,"Mean Coverage","#7570B3")
+## plot N5
+median_insert_size<-melt_data %>% filter(variable=="QualiMap_mqc_generalstats_qualimap_median_insert_size"  & ! is.na(value))
+plot.median_insert_size<-plotQC(median_insert_size,"Median Insert Size (bp)","#66A61E")
+## plot N6
+gc<-melt_data %>% filter(variable=="QualiMap_mqc_generalstats_qualimap_avg_gc"  & ! is.na(value))
+plot.gc<-plotQC(gc,"GC Content (%)","#D95F02")
+```
+
+```{r grid2, echo=FALSE, warning=FALSE}
+combined_plot1 <- plot_grid(plot.total_reads, plot.pct_aligned,
+                           plot.mean_coverage,plot.percentage_50X,
+                           plot.median_insert_size,plot.gc, ncol = 2,nrow = 3,
+                           labels = c("A", "B","C","D","E","F"))
+
+combined_plot1
+```
+
+
 ## Supplementary Figure 3
 
 ```{r coverage, echo=FALSE}
@@ -514,7 +592,7 @@ dev.off()
 
 ```
 
-**Figure 5: Comparison of the nonsynonymous variants reported by the DeepVariant varcaller in single and multisample modes.** SNVs and INDELs reported for the 16 patients in the BRCA1 and BRCA2 genes. The Y-axis shows the number of patients with the mutation, and the X-axis shows the amino acids and domains of each gen
+**Figure 5: Comparison of the nonsynonymous variants reported by the DeepVariant varcaller in single and multisample modes.** SNVs and INDELs reported for the 16 patients in the BRCA1 and BRCA2 genes. The Y-axis shows the number of patients with the mutation, and the X-axis shows the amino acids and domains of each gen.
 
 ## Supplementary Figure 7
 
