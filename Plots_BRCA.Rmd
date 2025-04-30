@@ -182,25 +182,57 @@ dev.off()
 
 ## Figure 5
 
+```{r samplesCHI, echo=FALSE, warning=FALSE}
+library(dplyr)
+library(tidyr)
+varCHI<-read.csv("input/all.strelka.BRCA.annovar.hg38_multianno.txt",sep = "\t")
+varCHI<-varCHI[varCHI$Func.refGene=="exonic",] 
+varCHI$genomic_vcf38<-paste0(varCHI$Chr,":g.",varCHI$Otherinfo5,":",varCHI$Otherinfo7,">",varCHI$Otherinfo8)
+### Calcular la frecuencia
+varCHI$Tumor_Sample_Barcode<-NULL
+varCHI_transposed <- varCHI %>%
+  pivot_longer(cols = 58:120, names_to = "Tumor_Sample_Barcode", values_to = "Column_Info")
+
+varCHI_transposed_filtered <- varCHI_transposed %>%
+  filter(!(startsWith(Column_Info, "0/0") | startsWith(Column_Info, ".:."))) %>%
+  separate(Column_Info, into = c("GT", "GQ", "GQX", "DP", "DPF", "AD", "ADF", "ADR", "SB", "FT", "PL"), sep = ":")
+
+varCHI.pass<-varCHI_transposed_filtered[varCHI_transposed_filtered$Otherinfo10=="PASS",]
+
+varCHI.pass <- varCHI.pass %>% separate(GT, c("A1","A2"), "[/||]")
+varCHI.pass$sum<- as.numeric(varCHI.pass$A1) + as.numeric(varCHI.pass$A2)
+
+varCHI.pass_suma <- varCHI.pass %>%
+  group_by(genomic_vcf38) %>%
+  summarise(total_sum = sum(sum, na.rm = TRUE), .groups = 'drop')
+
+varCHI.pass_suma$sum<-NULL
+varCHI.pass_suma$chi_cnt<-varCHI.pass_suma$total_sum/126
+varCHI.pass_suma$total_sum<-NULL
+varCHI.pass_suma$chi_cnt<-as.numeric(varCHI.pass_suma$chi_cnt)
+```
+
+
 ```{r PCA1, echo=FALSE, warning=FALSE}
 library(dplyr)
 library(tidyr)
+library(factoextra)
+library(FactoMineR)
 
 variantes<-read.csv("input/Strelka_single_variants_PASS_exonic.tsv",sep = "\t")
 variantes<-variantes[variantes$Variant_Classification!="Silent",]
 
+variantes$genomic_vcf38<-paste0(variantes$Chr,":g.",variantes$Otherinfo5,":",variantes$Otherinfo7,">",variantes$Otherinfo8)
+
 variantes <- variantes %>% separate(Otherinfo13, c("GT"), "[:]")
 variantes <- variantes %>% separate(GT, c("A1","A2"), "[/||]")
 variantes$sum<- as.numeric(variantes$A1) + as.numeric(variantes$A2)
+variantes2<-variantes
 
-uniq<-variantes %>% distinct(txChange,Gene.refGene, gnomad40_genome_AF)
-uniq_sample<-variantes %>% distinct(Tumor_Sample_Barcode)
-## delete of variants without gnomad annotation 
 variantes.aux<-variantes[variantes$gnomad40_genome_AF!=".",]
 
-# gruop by 'aaChange' y summarise the column 'sum' 
 variantes_suma <- variantes.aux %>%
-  group_by(aaChange,
+  group_by(genomic_vcf38,
            gnomad40_genome_AF_afr,
            gnomad40_genome_AF_amr,
            gnomad40_genome_AF_ami,
@@ -218,18 +250,22 @@ variantes_suma$sum<-NULL
 variantes_suma$AF<-variantes_suma$total_sum/166
 variantes_suma$total_sum<-NULL
 variantes_suma$AF<-as.numeric(variantes_suma$AF)
-colnames(variantes_suma)<-c("aaChange","afr","amr","ami","asj","eas","sas","fin","mid","nfe","chi")
-variantes_suma <- variantes_suma %>% mutate_at(c("afr","amr","ami","asj","eas","sas","fin","mid","nfe","chi"), as.numeric)
+colnames(variantes_suma)<-c("genomic_vcf38","afr","amr","ami","asj","eas","sas","fin","mid","nfe","chi_brca")
+variantes_suma <- variantes_suma %>% mutate_at(c("afr","amr","ami","asj","eas","sas","fin","mid","nfe","chi_brca"), as.numeric)
+
+data.pca<-merge(variantes_suma,varCHI.pass_suma, all.x = T)
+
+data.pca$chi_cnt<- ifelse(is.na(data.pca$chi_cnt), 0,data.pca$chi_cnt)
 
 # Convert tibble to data frame
-data_pca_df<- t(as.data.frame(variantes_suma[,-1]))
+data_pca_df<- t(as.data.frame(data.pca[,-1]))
 # Set the row names
-colnames(data_pca_df) <- variantes_suma[[1]]
+colnames(data_pca_df) <- data.pca[[1]]
 
 ## PCA
-#res.pca<-prcomp(data_pca_df)
+res.pca<-prcomp(data_pca_df)
 res2.pca <- PCA(data_pca_df, ncp = 2, graph = FALSE,scale.unit = TRUE)
-#var <- get_pca_var(res2.pca)
+var <- get_pca_var(res2.pca)
 
 # Compute PCA with ncp = 2
 res.hcpc <- HCPC(res2.pca, graph = FALSE)
@@ -242,16 +278,35 @@ dend<-fviz_dend(res.hcpc,
           labels_track_height = 0.8,
           main="")
 
-contrib<-fviz_contrib(res2.pca, choice = "var", axes = 1,title="")
+contrib<-fviz_contrib(res2.pca, choice = "var", axes = 1,title="", top = 10)
+
+### Plot 1 - PCA - biplot
+pca_biplot<-fviz_pca_ind(res2.pca, repel = TRUE, col.ind = "#696969",title="")
+
+### Plot 2 - Percentahe of explained variances
+scree_plot<-fviz_eig(res2.pca,addlabels = TRUE,title="",hjust = -0.5)
+
+cluster<-fviz_cluster(res.hcpc,
+             repel = TRUE,
+             show.clust.cent = TRUE, 
+             palette = "jco",
+             ggtheme = theme_minimal(),
+             main = "")
 
 
-combined_plot<-plot_grid(dend, contrib, nrow = 1, ncol = 2)
-# save plot 
-png(file="Plots_BRCA_files/V2/Fig5_GG.png", width=8, height=3, res=400, unit = "in")
+combined_plot<-plot_grid(cluster, contrib, nrow = 1, ncol = 2)
+# save plot
+png(file="Plots_BRCA_files/V2/Fig5.png", width=8, height=3, res=400, unit = "in")
 combined_plot
 dev.off()
 
-combined_plot
+combined_plot2 <- plot_grid(pca_biplot, scree_plot, dend, rel_heights = 2, 
+                           nrow = 1, ncol = 3)
+# save plot
+png(file="Plots_BRCA_files/V2/Sup_fig7.png", width=12, height=4, res=400, unit = "in")
+combined_plot2
+dev.off()
+combined_plot2
 ```
 
 **Figure 5: Hierarchical clustering and variable contribution on principal components.** A) Clustering of PCA dimension B) Contribution of mutations to dimensions 1 and 2. A dashed line shown corresponds to the expected value if the contribution were uniform. Subpopulations: Africans (AFR), Admixed Americans (AMR), Amish (AMI), Ashkenazi Jewish (ASJ), East Asians (EAS), South Asians (SAS), Finns (FIN), Middle Easterners (MID), Non-Finnish Europeans (NFE), and women (XX).
@@ -321,8 +376,7 @@ deep_single <- load_variant_data("input/DeepVariant_single_variants_PASS_exonic.
 venn_single_ns <- create_venn(
   list(SOPHiA = sophia$ID, Strelka_single = strelka_single$ID, deepvariant_single = deep_single$ID),
   "Non-synonymous", c("#F6AC50", "#B54923"),
-  c("SOPHiA\nGENETICS", "STRELKA\nSINGLE", "\nDEEPVARIANT SINGLE")
-)
+  c("SOPHiA\nGENETICS", "STRELKA\nSINGLE", "\nDEEPVARIANT SINGLE"))
 
 venn_single_pat <- create_venn(
   list(SOPHiA = filter(sophia, CLNSIGLAB == "Pathogenic")$ID,
@@ -343,8 +397,7 @@ deep_multi <- load_variant_data("input/DeepVariant_pool_variants_PASS_exonic.tsv
 venn_multi_ns <- create_venn(
   list(SOPHiA = sophia$ID, Strelka_multisample = strelka_multi$ID, deepvariant_multisample = deep_multi$ID),
   "Non-synonymous", c("#F6AC50", "#B54923"),
-  c("SOPHiA\nGENETICS", "STRELKA\nMULTISAMPLE", "\nDEEPVARIANT MULTISAMPLE")
-)
+  c("SOPHiA\nGENETICS", "STRELKA\nMULTISAMPLE", "\nDEEPVARIANT MULTISAMPLE"))
 
 venn_multi_pat <- create_venn(
   list(SOPHiA = filter(sophia, CLNSIGLAB == "Pathogenic")$ID,
